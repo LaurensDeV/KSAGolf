@@ -1,0 +1,358 @@
+using Brutal.Numerics;
+
+namespace KSAGolf;
+
+/// <summary>Where to put a camera that rides behind something in flight, and how to ease onto it.</summary>
+public static class ChaseView
+{
+    // Below this a line has no reliable direction left to take Unit() of. Metres, because it is
+    // about the arithmetic rather than about framing.
+    private const double MinAimRange = 1.0;
+
+    /// <summary>The pose with its lift derived afresh, for a camera with no last frame to carry.</summary>
+    public static bool TryPose(double3 bodyEcl, double3 velocityLocal, double3? aimEcl,
+                               double3 upHint, double3 engineAxisEcl,
+                               double distanceBehind, double heightAbove, double lookAhead,
+                               out double3 eyeEcl, out double3 forwardEcl, out double3 upEcl)
+        => TryPose(bodyEcl, velocityLocal, aimEcl, upHint, engineAxisEcl, distanceBehind,
+                   heightAbove, lookAhead, Vec.Zero, out eyeEcl, out forwardEcl, out upEcl);
+
+    /// <summary>
+    /// Eye and forward for a camera trailing a body in flight, looking past it at what it is flying at.
+    /// </summary>
+    /// <param name="velocityLocal">
+    /// Relative to the ground, never ecliptic: the ecliptic's ~29.8 km/s is shared, so an absolute
+    /// velocity points everything the same way.
+    /// </param>
+    /// <param name="aimEcl">
+    /// What the body is flying at, in <paramref name="bodyEcl"/>'s frame, or null when it is
+    /// flying at nothing. Both are positions in one frame and this differences them itself, so a
+    /// translated frame — the body-relative one the caller works in — gives the same answer.
+    /// </param>
+    /// <param name="upHint">Away from the planet's centre. A hint; a parallel one is ignored.</param>
+    /// <param name="engineAxisEcl">
+    /// The axis the engine's camera controller cannot cross — <em>not</em>
+    /// <paramref name="upHint"/>, which stays the local vertical and decides the lift. See
+    /// <see cref="LeanOffAxis"/> for why the two are different directions.
+    /// </param>
+    /// <param name="liftReference">
+    /// Last frame's lift — the side of the axis the eye stood on — or zero to derive it from
+    /// <paramref name="upHint"/>. Comes back as <paramref name="upEcl"/>.
+    /// </param>
+    public static bool TryPose(double3 bodyEcl, double3 velocityLocal, double3? aimEcl,
+                               double3 upHint, double3 engineAxisEcl,
+                               double distanceBehind, double heightAbove, double lookAhead,
+                               double3 liftReference,
+                               out double3 eyeEcl, out double3 forwardEcl, out double3 upEcl)
+    {
+        eyeEcl = bodyEcl;
+        forwardEcl = Vec.Zero;
+        upEcl = upHint;
+
+        if (!Vec.IsFinite(bodyEcl) || !Vec.IsFinite(velocityLocal)) return false;
+
+        double3 along = Vec.Unit(velocityLocal);
+        if (Vec.Len2(along) < 0.5) return false;
+
+        double ahead = Math.Max(0.0, lookAhead);
+        double3 axis = along;
+        double lookRange = ahead;
+
+        // The rig stands behind the body on the line to what it is flying at, not on its own flight
+        // path: a falling body's target can sit tens of degrees below the path it is falling along,
+        // and a camera looking along that path never has it in frame at all.
+        if (aimEcl is { } aim && Vec.IsFinite(aim))
+        {
+            double3 toAim = aim - bodyEcl;
+            double range = Vec.Len(toAim);
+
+            // Held to the target all the way in, so the view does not swing off it at the one
+            // moment anybody is watching. The line reversing as the body goes past is
+            // HeldNearFlightPath's job, and it bounds the swing to 80°.
+            //
+            // The look-at stays at least a look-ahead out so the framing does not pitch up as the
+            // range collapses, and MinAimRange is a divide-by-zero guard rather than a distance.
+            if (range > MinAimRange)
+            {
+                axis = HeldNearFlightPath(Vec.Unit(toAim), along);
+                lookRange = Math.Max(range, ahead);
+            }
+        }
+
+        // Carried when there is one to carry. Derived from the hint, the lift is whatever part of
+        // the hint lies across the axis, which near the vertical is a sliver pointing the way the
+        // axis leans -- and past a threshold a fixed perpendicular instead. Either reverses the
+        // lift as the axis passes the vertical, so the eye swaps sides and the body appears to turn
+        // half a turn: something falling onto a point below it. The caller pulls the carried lift back
+        // towards the hint once a frame, which is what keeps it from drifting.
+        double3 carried = liftReference - axis * Vec.Dot(liftReference, axis);
+        double3 lift;
+
+        if (Vec.IsFinite(carried) && Vec.Len2(carried) > 1e-6)
+        {
+            lift = Vec.Unit(carried);
+        }
+        else
+        {
+            // A body straight up the hint leaves no sideways reference, so the lift has nowhere
+            // to go. Falling back to any perpendicular keeps the view usable instead of degenerate.
+            double3 up = Vec.Unit(upHint);
+            if (Vec.Len2(up) < 0.5 || Math.Abs(Vec.Dot(up, axis)) > 0.999) up = AnyPerpendicular(axis);
+
+            // Lift perpendicular to the axis the eye stands off along, not along the hint: at a
+            // steep climb angle the two are nearly the same direction and the camera would sit in
+            // front of the body.
+            lift = Vec.Unit(up - axis * Vec.Dot(up, axis));
+            if (Vec.Len2(lift) < 0.5) lift = AnyPerpendicular(axis);
+        }
+
+        eyeEcl = bodyEcl - axis * Math.Max(0.0, distanceBehind) + lift * heightAbove;
+
+        // Along the axis rather than at the aim itself, so a target held out at the cone edge
+        // leaves the body centred: the ride is of the body, and what it is flying at is what
+        // stands behind it.
+        double3 lookAt = bodyEcl + axis * lookRange;
+        forwardEcl = lookAt - eyeEcl;
+
+        if (Vec.Len2(forwardEcl) < 1e-12) return false;
+
+        forwardEcl = LeanOffAxis(Vec.Unit(forwardEcl), engineAxisEcl);
+        upEcl = lift;
+
+        return Vec.IsFinite(eyeEcl) && Vec.IsFinite(forwardEcl);
+    }
+
+    /// <summary>
+    /// The pose turned about the body by the player, and moved in or out along the line from it.
+    ///
+    /// <para>The whole rig turns — eye, view and up together — so the body stays exactly where it
+    /// was in the picture and the view's roll is carried rather than re-derived. With nothing to
+    /// apply it is the pose handed in to the bit, which is what lets a view the player has let go of
+    /// settle onto the chase's own.</para>
+    /// </summary>
+    /// <param name="eyeFromBody">The eye, as a separation from the body.</param>
+    /// <param name="localUp">What the yaw turns about, as KSA's orbit camera turns about the vertical.</param>
+    /// <param name="yaw">See <see cref="ChaseOrbit.Yaw"/>.</param>
+    /// <param name="pitch">See <see cref="ChaseOrbit.Pitch"/>; positive raises the eye.</param>
+    /// <param name="lowestEye">
+    /// How far along <paramref name="localUp"/> the eye may sit from the body, negative being below
+    /// it. The pitch gives way to it and the yaw does not, so a view turned into the ground stops at
+    /// the ground rather than refusing the turn.
+    /// </param>
+    public static void Orbit(double3 eyeFromBody, double3 forward, double3 up, double3 localUp,
+                             double yaw, double pitch, double zoom, double lowestEye,
+                             double3 engineAxisEcl,
+                             out double3 eyeEcl, out double3 forwardEcl, out double3 upEcl)
+    {
+        eyeEcl = eyeFromBody;
+        forwardEcl = forward;
+        upEcl = up;
+
+        if (yaw == 0.0 && pitch == 0.0 && zoom == 1.0) return;
+        if (!Vec.IsFinite(eyeFromBody) || !Vec.IsFinite(forward) || !Vec.IsFinite(up)) return;
+        if (!double.IsFinite(yaw) || !double.IsFinite(pitch) || !(zoom > 0.0) || !double.IsFinite(zoom)) return;
+
+        double3 vertical = Vec.Unit(localUp);
+        if (Vec.Len2(vertical) < 0.5) return;
+
+        // Square to the view and its own up, which has a length however steeply the view looks
+        // down; a right taken off the vertical has none when a body falls straight onto its target.
+        double3 right = Vec.Unit(Vec.Cross(up, forward));
+        if (Vec.Len2(right) < 0.5) right = AnyPerpendicular(forward);
+
+        double3 eye = Turned(pitch, out double3 turnedForward, out double3 turnedUp);
+
+        if (Vec.Dot(eye, vertical) < lowestEye)
+        {
+            double allowed = 0.0;
+            double refused = 1.0;
+
+            // Nothing below the floor is used, and the full turn was: find how much of the pitch the
+            // floor leaves. Falls back to none of it, which is the yaw and zoom alone.
+            for (int i = 0; i < 24; i++)
+            {
+                double mid = 0.5 * (allowed + refused);
+                if (Vec.Dot(Turned(pitch * mid, out _, out _), vertical) >= lowestEye) allowed = mid;
+                else refused = mid;
+            }
+
+            eye = Turned(pitch * allowed, out turnedForward, out turnedUp);
+        }
+
+        forwardEcl = LeanOffAxis(Vec.Unit(turnedForward), engineAxisEcl);
+        upEcl = turnedUp;
+        eyeEcl = eye;
+
+        if (Vec.IsFinite(eyeEcl) && Vec.IsFinite(forwardEcl) && Vec.IsFinite(upEcl)) return;
+
+        eyeEcl = eyeFromBody;
+        forwardEcl = forward;
+        upEcl = up;
+
+        double3 Turned(double withPitch, out double3 f, out double3 u)
+        {
+            doubleQuat q = doubleQuat.CreateFromAxisAngle(vertical, yaw)
+                           * doubleQuat.CreateFromAxisAngle(right, withPitch);
+
+            f = q * forward;
+            u = q * up;
+            return (q * eyeFromBody) * zoom;
+        }
+    }
+
+    /// <summary>
+    /// Tilts a view direction away from the axis the engine's camera cannot cross.
+    ///
+    /// <para>KSA's fixed camera builds its basis by crossing the view with that axis and
+    /// normalising, so a parallel pair divides by zero — and a body launched straight up points
+    /// very near it. Every direction handed to the engine goes through here.</para>
+    ///
+    /// <para><b>The axis is ecliptic +Z, not the local vertical.</b> The controller crosses against
+    /// the camera reference frame's +Z, and a followable that is not a vehicle or a celestial gets
+    /// the Identity frame with its declared reference frame ignored entirely. Leaning off local up
+    /// instead guards a singularity that is not there and leaves the real one open, and
+    /// <c>KsaWorld.TryLookFromMainViewport</c> then refuses the write and the chase drops the view
+    /// in mid-flight. See <c>docs/KSA-CAMERAS.md</c>.</para>
+    /// </summary>
+    public static double3 LeanOffAxis(double3 forward, double3 axisHint)
+    {
+        double3 axis = Vec.Unit(axisHint);
+        if (Vec.Len2(axis) < 0.5) return forward;
+
+        double alongAxis = Vec.Dot(forward, axis);
+        if (Math.Abs(alongAxis) <= MaxAlongAxis) return forward;
+
+        double3 sideways = forward - axis * alongAxis;
+        sideways = Vec.Len2(sideways) < 1e-12 ? AnyPerpendicular(axis) : Vec.Unit(sideways);
+
+        double lean = alongAxis < 0.0 ? -MaxAlongAxis : MaxAlongAxis;
+
+        return Vec.Unit(axis * lean + sideways * Math.Sqrt(1.0 - (MaxAlongAxis * MaxAlongAxis)));
+    }
+
+    // About 2.6 degrees off the axis: enough for the cross product to have a length to normalise.
+    private const double MaxAlongAxis = 0.999;
+
+    // Holds a direction within MaxOffFlightPathDeg of the flight path, keeping the plane the two
+    // lie in. What it bounds is a body that has gone past what it was aimed at: the line to the
+    // target then swings through abeam and reverses, and a rig built on it whips round to face
+    // backwards over a frame or two. Clamping is continuous where refusing is not -- at the bound
+    // the held direction is the wanted one -- so a shot that misses slides to the edge and stays.
+    private static double3 HeldNearFlightPath(double3 direction, double3 along)
+    {
+        double off = Math.Acos(Math.Clamp(Vec.Dot(direction, along), -1.0, 1.0));
+        if (off <= MaxOffFlightPath) return direction;
+
+        double3 across = Vec.RejectFrom(direction, along);
+        if (Vec.Len2(across) < 1e-12) return along;
+
+        return Vec.Unit(Vec.Unit(across) * Math.Sin(MaxOffFlightPath)
+                        + along * Math.Cos(MaxOffFlightPath));
+    }
+
+    // Generous, because the angle a falling body's target sits below its flight path has no bound.
+    // What this is for is the reversal, not a framing rule.
+    private const double MaxOffFlightPathDeg = 80.0;
+
+    private static readonly double MaxOffFlightPath = MaxOffFlightPathDeg * Math.PI / 180.0;
+
+    /// <summary>
+    /// How far back the camera sits, closing in as the body converges.
+    ///
+    /// <para>A fixed stand-off makes a body appear to hang still, because everything in frame
+    /// scales together. The easing accelerates into the impact: a symmetric one is flat at both
+    /// ends, so it is slowest exactly where the arrival happens.</para>
+    /// </summary>
+    /// <param name="range">Distance from the body to what it is aimed at.</param>
+    /// <param name="far">At or beyond this range, the full stand-off.</param>
+    /// <param name="near">At or inside this range, the closest the camera comes.</param>
+    public static double StandOff(double range, double far, double near,
+                                  double farDistance, double nearDistance)
+    {
+        if (!double.IsFinite(range) || !(far > near)) return farDistance;
+
+        double t = Math.Clamp((range - near) / (far - near), 0.0, 1.0);
+
+        // A root curve: the slope grows as the range runs out, so it holds station then rushes in.
+        t = Math.Pow(t, Sharpness);
+
+        return nearDistance + ((farDistance - nearDistance) * t);
+    }
+
+    // Below one, so the closing accelerates rather than easing off. Lower closes later and harder.
+    private const double Sharpness = 0.5;
+
+    /// <summary>
+    /// Eases a camera from where the player had it onto the chase pose, turning the look from the
+    /// body onto what it is flying at.
+    ///
+    /// <para>The look starts on the body and is fully on <paramref name="toLookAtEcl"/> when the
+    /// transition ends, on the same ease the eye travels by. In between it is a lerp of the two
+    /// <b>as seen from wherever the eye has got to</b>, so the body slides from the middle of the
+    /// frame towards where the settled pose puts it while the target comes in behind.</para>
+    ///
+    /// <para><b>Both ends of the turn are taken at one depth</b>: the body's direction is carried
+    /// out to the range of the far end before the two are lerped. A body a hundred metres off
+    /// lerped against a target five kilometres away is taken over by the far point almost at once —
+    /// seven-eighths of a 60° turn in the first fifth of the transition. Two points at one depth
+    /// lerp as their directions do, so the turn is spread over the ease; an exactly opposed pair
+    /// lerps to nothing halfway, and is refused rather than normalised into NaN.</para>
+    ///
+    /// <para><b>Every point must be a position sampled this frame</b>, not a stored one. They are
+    /// anchored to different moving things, and the ecliptic is inertial — a point captured at the
+    /// start and held still falls half a kilometre behind per frame.</para>
+    /// </summary>
+    /// <param name="bodyEcl">The body being chased, where the turn starts.</param>
+    /// <param name="toLookAtEcl">
+    /// Along the settled view at the range of what the body is flying at, where the turn ends.
+    /// </param>
+    /// <param name="t">Progress, 0 at the player's pose and 1 at the chase. Clamped.</param>
+    public static bool TryBlend(double3 fromEcl, double3 toEcl,
+                                double3 bodyEcl, double3 toLookAtEcl,
+                                double3 engineAxisEcl, double t,
+                                out double3 eyeEcl, out double3 forwardEcl)
+    {
+        eyeEcl = toEcl;
+        forwardEcl = Vec.Unit(toLookAtEcl - toEcl);
+
+        if (!Vec.IsFinite(fromEcl) || !Vec.IsFinite(toEcl)) return false;
+        if (!Vec.IsFinite(bodyEcl) || !Vec.IsFinite(toLookAtEcl) || !double.IsFinite(t))
+        {
+            return false;
+        }
+
+        double e = Smoothstep(Math.Clamp(t, 0.0, 1.0));
+
+        eyeEcl = fromEcl + ((toEcl - fromEcl) * e);
+
+        double depth = Vec.Len(toLookAtEcl - eyeEcl);
+        if (depth < MinAimRange) return false;
+
+        // An eye on top of the body has no direction to it, so the far end is all there is.
+        double3 toBody = bodyEcl - eyeEcl;
+        double3 onBody = Vec.Len(toBody) > MinAimRange
+                          ? eyeEcl + (Vec.Unit(toBody) * depth)
+                          : toLookAtEcl;
+
+        double3 lookAt = onBody + ((toLookAtEcl - onBody) * e);
+        double3 forward = lookAt - eyeEcl;
+
+        if (Vec.Len2(forward) < 1e-6) return false;
+
+        // The same tilt the settled pose gets, for the same reason: a view along the axis KSA's
+        // fixed camera crosses against divides by zero, and a transition can sweep through it.
+        forwardEcl = LeanOffAxis(Vec.Unit(forward), engineAxisEcl);
+
+        return Vec.IsFinite(eyeEcl) && Vec.Len2(forwardEcl) > 0.5;
+    }
+
+    // Flat at both ends, so the camera leaves and arrives without a kick at either.
+    private static double Smoothstep(double t) => t * t * (3.0 - (2.0 * t));
+
+    private static double3 AnyPerpendicular(double3 axis)
+    {
+        double3 candidate = Math.Abs(axis.X) < 0.9 ? new double3(1, 0, 0) : new double3(0, 1, 0);
+
+        return Vec.Unit(Vec.Cross(axis, candidate));
+    }
+}
