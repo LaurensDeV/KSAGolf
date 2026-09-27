@@ -326,6 +326,13 @@ TOOLS = {
                          "rx": _num("deg"), "ry": _num("deg"), "rz": _num("deg"),
                          "x": _num("m"), "y": _num("m"), "z": _num("m"), "on": {"type": "boolean"}},
                         [], lambda a: [_text(json.dumps(send("kitten_prop", **a), indent=1))]),
+    "ksa_golf": ("Putting without a hand on the mouse. action is drop (a ball in front of the kitten), "
+                 "pickup, or address (steps up to the ball, or away from it). swing is the mouse's horizontal "
+                 "movement in pixels, one entry a frame: negative takes the club back, positive hits. Answers "
+                 "with the state once the swing is fed and wait_s more seconds have passed.",
+                 {"action": {"type": "string"}, "swing": {"type": "array", "items": {"type": "number"}},
+                  "wait_s": _num("s"), "look_yaw_deg": _num("deg")},
+                 [], lambda a: [_text(json.dumps(send("golf", timeout=120, **a), indent=1))]),
     "ksa_capture": ("Screenshot the game. frames>1 takes a series (every_s simulated seconds, or every_frames "
                     "rendered frames when paused) and returns a sheet, an animation path and a temporal-noise "
                     "map. variants=[{setting: value}] photographs each in the same paused instant as the base "

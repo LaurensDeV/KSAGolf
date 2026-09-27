@@ -656,6 +656,14 @@ def check_atlas(path, only, header=False):
         if only and name != only:
             continue
 
+        # A <GltfFile> renderable indexes its primitives' materials: a primitive naming none throws
+        # "Index was outside the bounds of the array" when the mod builds it, and nothing is drawn.
+        # Blender writes none when exported with Materials set to Placeholder or None.
+        unnamed = sum(1 for prim in mesh.get("primitives", []) if "material" not in prim)
+        if unnamed:
+            print(f"\n{name}: {unnamed} primitive(s) with NO MATERIAL — export with Materials: Export")
+            total += 1
+
         bad, bad_area, tris, missing = degenerate_uvs(gltf, binary, mesh)
         if missing:
             print(f"\n{name}: NO TEXCOORD_0 — the part will not texture")

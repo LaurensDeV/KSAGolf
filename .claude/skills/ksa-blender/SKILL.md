@@ -139,6 +139,7 @@ Format            glTF Binary (.glb)
 Apply Modifiers   ON
 Include           Selected Objects (or the collection)
 Data              Mesh: UVs, Normals.  No cameras, no lights
+Materials         Export, never Placeholder or None  <-- a <GltfFile> built with no material throws
 Compression       off
 ```
 
