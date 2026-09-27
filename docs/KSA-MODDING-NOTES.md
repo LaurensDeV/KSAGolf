@@ -754,6 +754,16 @@ swallowing. The only silent no-draws are `Visible == false` and a glTF with no m
 an attachment that is present but unseen is a *geometry* problem — wrong units, wrong winding, or
 wrapped around the camera — not a materials or registration one.
 
+## A mod's mesh can be drawn see-through, the way the visor is
+
+`CharacterAvatar` builds the helmet's visor as `new StaticMeshRenderable(CharacterRenderResources.GlassRenderer,
+gltf, MeshRendererStaticPrePass, isOpaque: false)`: the translucent pass, blended by the diffuse texture's
+alpha (Core's visor diffuse is `Kitty_Helmet_Visor_A`). `Program.Instance.CharacterRenderResources` is
+public, so a mod's own `<GltfFile>` can be drawn the same way; the course builder's ghost is. A
+renderable reads each primitive's material handle once, when it is constructed (`MaterialIndices`), so
+one glTF can back a solid renderable and a see-through one with different materials, provided the
+materials are written into `GltfPbrAssetRef.Materials` before each is built.
+
 ## Sound: reachable, and shipped the same way art is
 
 A mod can make a noise, on every axis that matters.

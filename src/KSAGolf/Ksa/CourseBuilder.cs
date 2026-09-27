@@ -590,33 +590,68 @@ internal sealed class CourseBuilder(Golf golf) : IViewPose
 
     private void DrawMeshes(IViewport viewport, double3 originEgo, double3 i, double3 j, double3 up)
     {
-        SuperMeshRenderSystem system = Program.Instance.SuperMeshRenderSystem;
-        double c = CourseSize.CellM;
-        foreach (Placed piece in Course.Pieces)
+        foreach (Placed piece in Course.Pieces) DrawPiece(viewport, piece, originEgo, i, j, up, id => MeshOf(id, piece.Def.Id));
+
+        // The piece about to be laid, see-through and tinted by how it would sit.
+        if (Active && _ghost is { } ghost)
         {
-            if (Model(piece) is not { } model || MeshOf(model.Id, piece.Def.Id) is not { } mesh) continue;
+            string tint = ghost.Fit switch { Fit.Connects => "Fits", Fit.Open => "Open", _ => "Blocked" };
+            DrawPiece(viewport, ghost.Piece, originEgo, i, j, up, id => GhostOf(id, tint));
+        }
+    }
 
-            (double2 x, double2 y, double2 at) = piece.Placement(model.Turn);
-            double lift = piece.Level * CourseSize.LevelM;
-            Draw(mesh, (i * x.X) + (j * x.Y), (i * y.X) + (j * y.Y), up, originEgo + (i * at.X) + (j * at.Y) + (up * lift));
+    private static void DrawPiece(IViewport viewport, Placed piece, double3 originEgo, double3 i, double3 j, double3 up,
+                                  Func<string, StaticMeshRenderable?> meshOf)
+    {
+        if (Model(piece) is not { } model || meshOf(model.Id) is not { } mesh) return;
 
-            // A piece laid above the ground stands on a block reaching down to it.
-            if (piece.Level > 0 && MeshOf(Plinth, "plinth") is { } plinth)
+        SuperMeshRenderSystem system = Program.Instance.SuperMeshRenderSystem;
+        void Draw(StaticMeshRenderable m, double3 ex, double3 ey, double3 ez, double3 t)
+        {
+            m.Transform = new float4x4((float)ex.X, (float)ex.Y, (float)ex.Z, 0f,
+                                       (float)ey.X, (float)ey.Y, (float)ey.Z, 0f,
+                                       (float)ez.X, (float)ez.Y, (float)ez.Z, 0f,
+                                       (float)t.X, (float)t.Y, (float)t.Z, 1f);
+            m.Draw(system.ViewForViewport(viewport));
+        }
+
+        double c = CourseSize.CellM;
+        (double2 x, double2 y, double2 at) = piece.Placement(model.Turn);
+        double lift = piece.Level * CourseSize.LevelM;
+        Draw(mesh, (i * x.X) + (j * x.Y), (i * y.X) + (j * y.Y), up, originEgo + (i * at.X) + (j * at.Y) + (up * lift));
+
+        // A piece laid above the ground stands on a block reaching down to it.
+        if (piece.Level > 0 && meshOf(Plinth) is { } plinth)
+        {
+            if (piece.Def.IsRectangle)
             {
                 (int w, int h) = piece.Footprint;
                 Draw(plinth, i * (w * c), j * (h * c), up * lift,
                      originEgo + (i * (piece.Origin.I * c)) + (j * (piece.Origin.J * c)) + (up * (lift - PieceShape.BaseDepthM)));
             }
+            else
+            {
+                foreach (Cell tile in piece.Cells())
+                {
+                    Draw(plinth, i * c, j * c, up * lift, originEgo + (i * (tile.I * c)) + (j * (tile.J * c)) + (up * (lift - PieceShape.BaseDepthM)));
+                }
+            }
+        }
+    }
+
+    // A ghost falls back to the solid model if the see-through one cannot be built.
+    private StaticMeshRenderable? GhostOf(string id, string tint)
+    {
+        string key = $"{id}#{tint}";
+        if (_meshes.TryGetValue(key, out StaticMeshRenderable? mesh)) return mesh ?? MeshOf(id, "ghost");
+
+        if (!AttachmentMesh.TryBuild(id, $"KSAGolf_Ghost_{tint}_Material", out mesh, out string why, seeThrough: true))
+        {
+            Log.Warn($"the ghost is drawn solid: {why}");
         }
 
-        void Draw(StaticMeshRenderable mesh, double3 ex, double3 ey, double3 ez, double3 t)
-        {
-            mesh.Transform = new float4x4((float)ex.X, (float)ex.Y, (float)ex.Z, 0f,
-                                          (float)ey.X, (float)ey.Y, (float)ey.Z, 0f,
-                                          (float)ez.X, (float)ez.Y, (float)ez.Z, 0f,
-                                          (float)t.X, (float)t.Y, (float)t.Z, 1f);
-            mesh.Draw(system.ViewForViewport(viewport));
-        }
+        _meshes[key] = mesh;
+        return mesh ?? MeshOf(id, "ghost");
     }
 
     // The model a piece is drawn with and the turn it is drawn at: its own, turned; or, laid mirrored where

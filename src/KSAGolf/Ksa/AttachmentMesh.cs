@@ -19,7 +19,11 @@ internal static class AttachmentMesh
     /// Builds a renderable from a declared <c>&lt;GltfFile&gt;</c> with a declared <c>&lt;PbrMaterial&gt;</c> in
     /// every slot, or says why it could not.
     /// </summary>
-    public static bool TryBuild(string gltfId, string materialId, out StaticMeshRenderable? mesh, out string why)
+    /// <param name="seeThrough">
+    /// Drawn through the glass technique the helmet's visor uses, blended by the diffuse texture's alpha and
+    /// casting no shadow. The material is fixed when the renderable is built, so one glTF can be drawn both ways.
+    /// </param>
+    public static bool TryBuild(string gltfId, string materialId, out StaticMeshRenderable? mesh, out string why, bool seeThrough = false)
     {
         mesh = null;
         why = string.Empty;
@@ -50,9 +54,11 @@ internal static class AttachmentMesh
             // An exported .glb names a material slot, which is what gives this array a length.
             for (int i = 0; i < gltf.Materials.Length; i++) gltf.Materials[i] = material;
 
+            object technique = seeThrough ? Program.Instance.CharacterRenderResources.GlassRenderer : system.MeshRendererStaticPbr;
             mesh = (StaticMeshRenderable?)Activator.CreateInstance(
-                typeof(StaticMeshRenderable), system.MeshRendererStaticPbr, gltfName, system.MeshRendererStaticPrePass, true);
+                typeof(StaticMeshRenderable), technique, gltfName, system.MeshRendererStaticPrePass, !seeThrough);
             if (mesh is null) why = "the renderable could not be built";
+            else if (seeThrough) mesh.CastShadows = false;
             return mesh is not null;
         }
         catch (Exception e)

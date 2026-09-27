@@ -45,4 +45,20 @@
         <Normal Path="Textures/KSAGolf_Course_Normal.png" Category="Default"/>
         <AoRoughMetal Path="Textures/KSAGolf_Course_PBR.png" Category="Default"/>
     </PbrMaterial>
+    <!-- The ghost of a piece about to be laid, drawn see-through: one colour, so any UVs will do. -->
+    <PbrMaterial Id="KSAGolf_Ghost_Fits_Material">
+        <Diffuse Path="Textures/KSAGolf_Ghost_Fits.png" Category="Default"/>
+        <Normal Path="Textures/KSAGolf_Course_Normal.png" Category="Default"/>
+        <AoRoughMetal Path="Textures/KSAGolf_Ghost_PBR.png" Category="Default"/>
+    </PbrMaterial>
+    <PbrMaterial Id="KSAGolf_Ghost_Open_Material">
+        <Diffuse Path="Textures/KSAGolf_Ghost_Open.png" Category="Default"/>
+        <Normal Path="Textures/KSAGolf_Course_Normal.png" Category="Default"/>
+        <AoRoughMetal Path="Textures/KSAGolf_Ghost_PBR.png" Category="Default"/>
+    </PbrMaterial>
+    <PbrMaterial Id="KSAGolf_Ghost_Blocked_Material">
+        <Diffuse Path="Textures/KSAGolf_Ghost_Blocked.png" Category="Default"/>
+        <Normal Path="Textures/KSAGolf_Course_Normal.png" Category="Default"/>
+        <AoRoughMetal Path="Textures/KSAGolf_Ghost_PBR.png" Category="Default"/>
+    </PbrMaterial>
 </Assets>

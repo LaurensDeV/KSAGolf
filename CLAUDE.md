@@ -235,7 +235,7 @@ test build, and a new file under `Sim/` is tested the moment it exists.
 | `Ksa/HullTest.cs` | whether a step meets a craft's actual geometry, per triangle |
 | `Ksa/TerrainHeights.cs` | one body's height field, sampled coarsely and many times |
 | `Ksa/CraftMover.cs` | picks a craft up and sets it down elsewhere, from the panel |
-| `Ksa/AttachmentMesh.cs` | a mesh of this mod's own, built to hang on a kitten — **the material slot filled before the renderable is made** |
+| `Ksa/AttachmentMesh.cs` | a mesh of this mod's own, built to hang on a kitten or to draw in the world — **the material slot filled before the renderable is made**, which fixes it for that renderable; see-through through the visor's glass technique |
 | `Ksa/KittenPoseProbe.cs` | **whether a mod can pose a kitten** — bones posed through the engine's own pose-processor list, from the bridge's `kitten_pose` |
 | `Ksa/KittenPropProbe.cs` | **whether a mod can put something in a kitten's hand** — a mesh on the avatar's cosmetic attachments, from the bridge's `kitten_prop` |
 | `Ksa/Bridge.cs` | **commands from outside the game**, read from a folder beside the log and answered in another — pause, step, frame a shot, capture, pose a kitten. **Files, not a socket** |

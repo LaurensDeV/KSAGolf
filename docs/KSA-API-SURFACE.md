@@ -7,7 +7,7 @@ This is the checklist for a KSA update: anything here that changed shape in the 
 build is a breaking change for this mod, and anything not here cannot be. See the
 `upgrade-ksa` skill, which diffs the decompiled sources against exactly this list.
 
-156 types and 390 members across 8 assemblies.
+157 types and 393 members across 8 assemblies.
 
 ## BepuPhysics
 
@@ -471,6 +471,10 @@ build is a breaking change for this mod, and anything not here cannot be. See th
 
 - `Brutal.Numerics.float3 CameraForwardCce`
 
+### KSA.CharacterRenderResources
+
+- `KSA.MeshRenderTechnique GlassRenderer`
+
 ### KSA.Constants
 
 - `string get_DocumentsFolderPath()`
@@ -733,6 +737,7 @@ build is a breaking change for this mod, and anything not here cannot be. See th
 - `Brutal.GlfwApi.GlfwWindow GetWindow()`
 - `KSA.Camera GetMainCamera()`
 - `KSA.Camera GetRenderCamera()`
+- `KSA.CharacterRenderResources CharacterRenderResources`
 - `KSA.GizmosRenderer GizmosRenderer`
 - `KSA.IGameViewport get_MainViewport()`
 - `KSA.Program get_Instance()`
@@ -801,6 +806,7 @@ build is a breaking change for this mod, and anything not here cannot be. See th
 
 - `Brutal.Numerics.float4x4 Transform`
 - `KSA.GltfPbrAssetRef GltfAssetRef`
+- `bool CastShadows`
 - `void Dispose()`
 - `void Draw(RenderCore.Systems.ViewHandle)`
 
