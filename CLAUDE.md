@@ -189,7 +189,7 @@ test build, and a new file under `Sim/` is tested the moment it exists.
 | `Sim/IMouseDrag.cs` | a view the right button turns: `ChaseOrbit` and `HeadLook` |
 | `Sim/Stance.cs` | where a kitten is drawn standing to address a ball — **drawn, because a landed kitten cannot be moved** |
 | `Sim/CourseGrid.cs` | a course's grid: cells, sides, orientations, and **a port as the cell edge a lane crosses**, never a tile |
-| `Sim/PieceCatalogue.cs` | the pieces a course is built from, their footprints and ports — **ids append-only**, a saved course names them |
+| `Sim/PieceCatalogue.cs` | the pieces a course is built from, their ports and the tiles they take up — **not always a rectangle**, so a bend leaves its corner free — **ids append-only**, a saved course names them |
 | `Sim/Course.cs` | **one hole**: pieces joined port to port from tee to cup, the check that says why it cannot be played, and a ghost snapping onto an open port |
 | `Sim/CourseEdits.cs` | undo and redo over a course being built |
 | `Sim/PieceShape.cs` | **what each piece is exactly made of** — rails, posts, cup and felt — the one source the ball collides with and the Blender models are built from |

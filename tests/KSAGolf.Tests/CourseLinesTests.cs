@@ -123,4 +123,16 @@ public class CourseLinesTests
             }
         }
     }
+
+    [Fact]
+    public void AShapedPieceIsOutlinedAlongItsTilesOnly()
+    {
+        var bend = new Placed(PieceCatalogue.Find("bend2")!, new Cell(0, 0), Orientation.Identity, 0);
+        List<CourseLine> outline = [.. CourseLines.Of(new Course([bend])).Where(l => l.Kind is LineKind.Outline or LineKind.Faulty)];
+
+        // An L of three cells has eight unit edges round it, where its 2x2 box has eight too but not the same:
+        // none of them may cross the empty corner's middle.
+        Assert.Equal(8.0 * CourseSize.CellM, outline.Sum(l => Vec.Len(l.To - l.From)), 9);
+        Assert.DoesNotContain(outline, l => l.From.X > 1.0 && l.To.X > 1.0 && l.From.Y < 1.0 && l.To.Y < 1.0);
+    }
 }

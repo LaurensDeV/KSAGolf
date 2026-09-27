@@ -46,7 +46,7 @@ public class CourseTests
             {
                 var p = new Placed(def, new Cell(5, -3), o, 0);
                 List<Cell> cells = [.. p.Cells()];
-                Assert.Equal(def.W * def.H, cells.Distinct().Count());
+                Assert.Equal(def.LocalCells().Count(), cells.Distinct().Count());
                 Assert.All(cells, c => Assert.True(p.Covers(c)));
                 Assert.All(p.Ports(), q => Assert.True(p.Covers(q.Cell) && !p.Covers(q.Outside)));
             }
@@ -262,5 +262,27 @@ public class CourseTests
     {
         Assert.Null(CourseFile.FromJson("{\"version\": 99}", out string why));
         Assert.Contains("newer", why);
+    }
+
+    /// <summary>A bend takes up the cells its lane crosses; the corner it cuts across is free for another piece.</summary>
+    [Fact]
+    public void ABendLeavesTheCornerItCutsFree()
+    {
+        Course course = Hole(Put("bend2", 0, 0));
+
+        Assert.Equal(-1, course.PieceAt(new Cell(1, 0)));
+        Assert.Equal(0, course.PieceAt(new Cell(1, 1)));
+        Assert.NotEqual(Fit.Overlaps, course.Judge(Put("straight", 1, 0)));
+    }
+
+    [Fact]
+    public void AShapedPieceTurnsWithItsShape()
+    {
+        foreach (Orientation o in Orientation.All)
+        {
+            var bend = new Placed(Def("bend2"), new Cell(0, 0), o, 0);
+            Assert.Equal(3, bend.Cells().Count());
+            Assert.All(bend.Ports(), p => Assert.True(bend.Covers(p.Cell), $"{o}: a port on a cell the bend does not take up"));
+        }
     }
 }

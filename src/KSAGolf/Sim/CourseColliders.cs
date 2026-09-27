@@ -14,8 +14,8 @@ internal readonly record struct ColliderBox(double3 Centre, double3 X, double3 Y
 }
 
 /// <summary>
-/// What a kitten stands on: each piece's slab as one box, its top the felt and its bottom sunk into the ground,
-/// tilted along a ramp. Rails are left out, so a kitten steps across the lanes rather than catching on them.
+/// What a kitten stands on: each piece's slab as a box, its top the felt and its bottom sunk into the ground,
+/// tilted along a ramp, and one per tile for a piece that is not a rectangle. Rails are left out, so a kitten steps across the lanes rather than catching on them.
 /// </summary>
 internal static class CourseColliders
 {
@@ -35,9 +35,13 @@ internal static class CourseColliders
             if (ports.Length < 2 || ports[0].Level == ports[1].Level)
             {
                 double top = piece.Level * CourseSize.LevelM, bottom = -PieceShape.BaseDepthM;
-                boxes.Add(new ColliderBox(new double3(middle.X, middle.Y, (top + bottom) / 2.0),
-                                          new double3(1, 0, 0), new double3(0, 1, 0), new double3(0, 0, 1),
-                                          new double3(w * c, h * c, top - bottom)));
+                ColliderBox Flat(double2 centre, double width, double depth)
+                    => new(new double3(centre.X, centre.Y, (top + bottom) / 2.0), new double3(1, 0, 0), new double3(0, 1, 0), new double3(0, 0, 1),
+                           new double3(width, depth, top - bottom));
+
+                // A rectangle is one box; a shaped piece, a box per tile, so its empty cells stay empty.
+                if (piece.Def.IsRectangle) boxes.Add(Flat(middle, w * c, h * c));
+                else boxes.AddRange(piece.Cells().Select(t => Flat(new double2((t.I + 0.5) * c, (t.J + 0.5) * c), c, c)));
                 continue;
             }
 

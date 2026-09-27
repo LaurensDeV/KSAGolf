@@ -7,13 +7,7 @@ internal sealed record Placed(PieceDef Def, Cell Origin, Orientation Orientation
 {
     public (int W, int H) Footprint => Orientation.Footprint(Def.W, Def.H);
 
-    public IEnumerable<Cell> Cells()
-    {
-        for (int i = 0; i < Def.W; i++)
-        {
-            for (int j = 0; j < Def.H; j++) yield return Origin + Orientation.Apply(new Cell(i, j), Def.W, Def.H);
-        }
-    }
+    public IEnumerable<Cell> Cells() => Def.LocalCells().Select(c => Origin + Orientation.Apply(c, Def.W, Def.H));
 
     public IEnumerable<Port> Ports() => Def.Ports.Select(p =>
         new Port(Origin + Orientation.Apply(p.Cell, Def.W, Def.H), Orientation.Apply(p.Side), Level + p.Level));
@@ -74,7 +68,9 @@ internal sealed record Placed(PieceDef Def, Cell Origin, Orientation Orientation
     {
         (int w, int h) = Footprint;
         Cell d = cell - Origin;
-        return d.I >= 0 && d.J >= 0 && d.I < w && d.J < h;
+        if (d.I < 0 || d.J < 0 || d.I >= w || d.J >= h) return false;
+
+        return Def.IsRectangle || Def.Covers(Orientation.Undo(d, Def.W, Def.H));
     }
 
     /// <summary>

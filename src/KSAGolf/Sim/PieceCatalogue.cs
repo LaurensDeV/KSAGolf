@@ -14,12 +14,35 @@ internal enum PieceKind
 /// <param name="Id">Named by saved courses, so never renamed once shipped.</param>
 /// <param name="Mesh">The <c>&lt;GltfFile&gt;</c> drawn for it, modelled unturned; null while it is drawn as lines.</param>
 /// <param name="MirrorMesh">Its mirror image, for a piece whose mirror is not one of its turns.</param>
-internal sealed record PieceDef(string Id, string Name, PieceKind Kind, int W, int H, Port[] Ports, string? Mesh = null, string? MirrorMesh = null)
+/// <param name="Tiles">
+/// The cells it takes up, where that is not its whole <paramref name="W"/> × <paramref name="H"/>: a bend is an L,
+/// and the cells its lane never crosses are left free for another piece.
+/// </param>
+internal sealed record PieceDef(string Id, string Name, PieceKind Kind, int W, int H, Port[] Ports, string? Mesh = null, string? MirrorMesh = null,
+                                Cell[]? Tiles = null)
 {
+    /// <summary>The cells it takes up, unturned.</summary>
+    public IEnumerable<Cell> LocalCells()
+    {
+        if (Tiles is not null)
+        {
+            foreach (Cell tile in Tiles) yield return tile;
+            yield break;
+        }
+
+        for (int i = 0; i < W; i++)
+        {
+            for (int j = 0; j < H; j++) yield return new Cell(i, j);
+        }
+    }
+
+    public bool IsRectangle => Tiles is null;
+
     /// <summary>What is wrong with the definition itself, or null.</summary>
     public string? Fault()
     {
         if (W < 1 || H < 1) return $"{Id}: footprint {W}x{H}";
+        if (Tiles is not null && Tiles.Any(t => t.I < 0 || t.J < 0 || t.I >= W || t.J >= H)) return $"{Id}: a tile outside its {W}x{H}";
         if (Ports.Length != (Kind == PieceKind.Lane ? 2 : 1)) return $"{Id}: {Ports.Length} ports for a {Kind}";
 
         foreach (Port port in Ports)
@@ -48,9 +71,14 @@ internal sealed record PieceDef(string Id, string Name, PieceKind Kind, int W, i
         return null;
     }
 
-    private string Key(Orientation o) => string.Join(",", Ports.Select(p => $"{o.Apply(p.Cell, W, H)}{o.Apply(p.Side)}{p.Level}").Order());
+    // How a piece lies once laid, whatever orientation got it there: its ports and the cells it takes up.
+    private string Key(Orientation o)
+        => string.Join(",", Ports.Select(p => $"{o.Apply(p.Cell, W, H)}{o.Apply(p.Side)}{p.Level}").Order())
+           + "|" + string.Join(",", LocalCells().Select(c => o.Apply(c, W, H).ToString()).Order());
 
-    public bool Covers(Cell local) => local.I >= 0 && local.J >= 0 && local.I < W && local.J < H;
+    /// <summary>Whether it takes up a cell of its own, unturned.</summary>
+    public bool Covers(Cell local)
+        => local.I >= 0 && local.J >= 0 && local.I < W && local.J < H && (Tiles is null || Array.IndexOf(Tiles, local) >= 0);
 
     /// <summary>
     /// The orientations that lay the piece down differently, in the order of <see cref="Orientation.All"/>:
@@ -63,8 +91,7 @@ internal sealed record PieceDef(string Id, string Name, PieceKind Kind, int W, i
         foreach (Orientation o in Orientation.All)
         {
             (int w, int h) = o.Footprint(W, H);
-            IEnumerable<string> ports = Ports.Select(p => $"{o.Apply(p.Cell, W, H)}{o.Apply(p.Side)}{p.Level}").Order();
-            if (seen.Add($"{w}x{h}:{string.Join(",", ports)}")) kept.Add(o);
+            if (seen.Add($"{w}x{h}:{Key(o)}")) kept.Add(o);
         }
 
         return [.. kept];
@@ -83,8 +110,10 @@ internal static class PieceCatalogue
         new("straight", "Straight", PieceKind.Lane, 1, 1, [P(0, 0, Side.South), P(0, 0, Side.North)], "KSAGolf_Piece_Straight_Glb"),
         new("straight3", "Long straight", PieceKind.Lane, 1, 3, [P(0, 0, Side.South), P(0, 2, Side.North)], "KSAGolf_Piece_Straight3_Glb"),
         new("corner", "Corner", PieceKind.Lane, 1, 1, [P(0, 0, Side.South), P(0, 0, Side.East)], "KSAGolf_Piece_Corner_Glb"),
-        new("bend2", "Wide bend", PieceKind.Lane, 2, 2, [P(0, 0, Side.South), P(1, 1, Side.East)], "KSAGolf_Piece_Bend2_Glb"),
-        new("sbend", "S-bend", PieceKind.Lane, 2, 3, [P(0, 0, Side.South), P(1, 2, Side.North)], "KSAGolf_Piece_SBend_Glb", "KSAGolf_Piece_SBendMirror_Glb"),
+        new("bend2", "Wide bend", PieceKind.Lane, 2, 2, [P(0, 0, Side.South), P(1, 1, Side.East)], "KSAGolf_Piece_Bend2_Glb", null,
+            [new(0, 0), new(0, 1), new(1, 1)]),
+        new("sbend", "S-bend", PieceKind.Lane, 2, 3, [P(0, 0, Side.South), P(1, 2, Side.North)], "KSAGolf_Piece_SBend_Glb", "KSAGolf_Piece_SBendMirror_Glb",
+            [new(0, 0), new(0, 1), new(1, 1), new(1, 2)]),
         new("ramp", "Ramp", PieceKind.Lane, 1, 2, [P(0, 0, Side.South), P(0, 1, Side.North, 1)], "KSAGolf_Piece_Ramp_Glb"),
         new("room2", "Small room", PieceKind.Lane, 2, 2, [P(0, 0, Side.South), P(1, 1, Side.North)], "KSAGolf_Piece_Room2_Glb"),
         new("room4", "Bumper room", PieceKind.Lane, 4, 4, [P(1, 0, Side.South), P(2, 3, Side.North)], "KSAGolf_Piece_Room4_Glb"),

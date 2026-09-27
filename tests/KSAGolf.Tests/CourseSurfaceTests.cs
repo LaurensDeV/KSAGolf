@@ -180,11 +180,12 @@ public class CourseSurfaceTests
             foreach (Orientation o in Orientation.All)
             {
                 var piece = new Placed(def, new Cell(-2, 5), o, 0);
-                var p = new double2(0.31 * def.W, 0.77 * def.H);
+                Cell tile = def.LocalCells().Last();
+                var p = new double2((tile.I + 0.31) * CourseSize.CellM, (tile.J + 0.77) * CourseSize.CellM);
                 double2 there = piece.ToCourse(p);
 
                 Assert.True(double2.Distance(piece.ToPiece(there), p) < 1e-12, $"{def.Id} {o}");
-                Assert.True(piece.Covers(BuildView.CellAt(there)), $"{def.Id} {o} put its middle outside its cells");
+                Assert.True(piece.Covers(BuildView.CellAt(there)), $"{def.Id} {o} put its last tile outside its cells");
             }
         }
     }

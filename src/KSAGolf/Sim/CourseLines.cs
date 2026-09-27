@@ -49,15 +49,24 @@ internal static class CourseLines
             Placed piece = course.Pieces[n];
             int first = lines.Count;
             (int w, int h) = piece.Footprint;
-            double x0 = piece.Origin.I, y0 = piece.Origin.J, x1 = x0 + w, y1 = y0 + h;
+            double x0 = piece.Origin.I, y0 = piece.Origin.J;
             LineKind edge = faulty.Contains(n) ? LineKind.Faulty : LineKind.Outline;
 
-            Add(lines, piece, new(x0, y0), new(x1, y0), edge);
-            Add(lines, piece, new(x1, y0), new(x1, y1), edge);
-            Add(lines, piece, new(x1, y1), new(x0, y1), edge);
-            Add(lines, piece, new(x0, y1), new(x0, y0), edge);
-            for (int i = 1; i < w; i++) Add(lines, piece, new(x0 + i, y0), new(x0 + i, y1), LineKind.Cell);
-            for (int j = 1; j < h; j++) Add(lines, piece, new(x0, y0 + j), new(x1, y0 + j), LineKind.Cell);
+            // Each tile's four edges: an outline where the piece ends, a cell edge between two of its tiles.
+            // The edge between two tiles is drawn from the lower one only.
+            HashSet<Cell> tiles = [.. piece.Cells()];
+            foreach (Cell tile in tiles)
+            {
+                double tx = tile.I, ty = tile.J;
+                foreach ((Side side, double2 a, double2 b) in (ReadOnlySpan<(Side, double2, double2)>)
+                         [(Side.South, new(tx, ty), new(tx + 1, ty)), (Side.East, new(tx + 1, ty), new(tx + 1, ty + 1)),
+                          (Side.North, new(tx + 1, ty + 1), new(tx, ty + 1)), (Side.West, new(tx, ty + 1), new(tx, ty))])
+                {
+                    bool inner = tiles.Contains(tile.Toward(side));
+                    if (!inner) Add(lines, piece, a, b, edge);
+                    else if (side is Side.North or Side.East) Add(lines, piece, a, b, LineKind.Cell);
+                }
+            }
 
             Port[] ports = [.. piece.Ports()];
             foreach (Port port in ports)
