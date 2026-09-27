@@ -1,6 +1,7 @@
 using Brutal.GlfwApi;
 using Brutal.Numerics;
 using KSA;
+using RenderCore.Input;
 
 namespace KSAGolf;
 
@@ -72,11 +73,35 @@ internal sealed class LevelHorizonController(Camera camera) : FixedController(ca
 
     // Asked of the pose source rather than held here, so only a borrower that lets its view be
     // looked around takes the right button and the wheel from the engine.
-    private ChaseOrbit? Orbit => Pose?.Orbit;
+    private IMouseDrag? Orbit => Pose?.Orbit;
+
+    // A view with a swing takes the mouse whole: it moves the club, and a click would reach through
+    // to whatever part is under the hidden cursor.
+    private IMouseSwing? Swinging => Pose?.Swing;
+
+    // A view that takes the input is read through ImGui, which sees every key and button before the engine
+    // does, so swallowing here costs it nothing and keeps the kitten from walking off.
+    private bool TakesInput => Pose?.TakesInput == true;
+
+    public override bool OnKey(GlfwKeyEvent keyEvent)
+    {
+        if (TakesInput && !keyEvent.IsMouse && keyEvent.Action != GlfwKeyAction.Release && Swallowed(keyEvent.Key)) return true;
+
+        return base.OnKey(keyEvent);
+    }
+
+    // Letters, digits, the arrows and the editing keys: what walks a kitten and what the builder uses.
+    // Escape and the function keys still reach the game.
+    private static bool Swallowed(GlfwKey key)
+        => key is >= GlfwKey.A and <= GlfwKey.Z or >= GlfwKey.Number0 and <= GlfwKey.Number9 or GlfwKey.Space
+               or >= GlfwKey.Insert and <= GlfwKey.PageDown;
 
     public override bool OnMouseButton(GlfwWindow window, GlfwMouseButton button, GlfwButtonAction action,
                                        GlfwModifier mods)
     {
+        if (TakesInput) return true;
+        if (Swinging is not null && button == GlfwMouseButton.Number1) return true;
+
         if (Orbit is not { } orbit || button != GlfwMouseButton.Number2)
         {
             return base.OnMouseButton(window, button, action, mods);
@@ -91,6 +116,12 @@ internal sealed class LevelHorizonController(Camera camera) : FixedController(ca
 
     public override bool OnCursorPos(GlfwWindow window, double2 pos)
     {
+        if (Swinging is { } swing)
+        {
+            swing.Cursor(pos.X, pos.Y);
+            return true;
+        }
+
         if (Orbit is not { } orbit) return base.OnCursorPos(window, pos);
 
         orbit.Move(pos.X, pos.Y);
@@ -99,6 +130,7 @@ internal sealed class LevelHorizonController(Camera camera) : FixedController(ca
 
     public override bool OnScroll(GlfwWindow window, double2 offset)
     {
+        if (TakesInput) return true;
         if (Orbit is not { } orbit) return base.OnScroll(window, offset);
 
         orbit.Scroll(offset.Y);
@@ -107,12 +139,12 @@ internal sealed class LevelHorizonController(Camera camera) : FixedController(ca
 
     // Load-bearing: the engine asks the active controller this before a right-release opens the
     // window of whatever part is under the cursor, so a drag ending over a craft opens nothing.
-    public override bool IsMouseDrag() => Orbit?.Dragging == true || base.IsMouseDrag();
+    public override bool IsMouseDrag() => TakesInput || Orbit?.Dragging == true || base.IsMouseDrag();
 
     // Hidden and unbounded while dragging, as the orbit camera's is, so a drag does not stop at the
     // edge of the screen.
     public override GlfwCursorMode GetCursorMode()
-        => Orbit?.Dragging == true ? GlfwCursorMode.Disabled : base.GetCursorMode();
+        => Swinging is not null || Orbit?.Dragging == true ? GlfwCursorMode.Disabled : base.GetCursorMode();
 
     public override void OnFrame(IViewport inViewport, double inDeltaTime)
     {
@@ -136,8 +168,9 @@ internal sealed class LevelHorizonController(Camera camera) : FixedController(ca
 
         // How fast the wanted up may pull the carried one. Fast enough that levelling looks
         // immediate on any ordinary slew, slow enough that it cannot snap: at 180 deg/s a frame
-        // moves it three degrees, which is below what anyone sees as a jump.
-        double step = LevelRateRad * Math.Clamp(inDeltaTime, 0.0, 0.1);
+        // moves it three degrees, which is below what anyone sees as a jump. A view the mouse turns
+        // directly states its own up exactly, and a limit there is roll trailing a hard turn.
+        double step = Pose?.UpIsExact == true ? Math.PI : LevelRateRad * Math.Clamp(inDeltaTime, 0.0, 0.1);
 
         if (!StableUp.Try(forward, UpEcl, _lastUp, step, out double3 up))
         {
@@ -287,5 +320,27 @@ internal interface IViewPose
     /// The player looking around this view, or null for a view that is not looked around. Non-null
     /// is what hands the right button and the wheel to it rather than to the engine.
     /// </summary>
-    ChaseOrbit? Orbit { get; }
+    IMouseDrag? Orbit { get; }
+
+    /// <summary>Something the mouse moves while this view is held -- a club, or the view itself -- or null to leave the mouse alone.</summary>
+    IMouseSwing? Swing => null;
+
+    /// <summary>
+    /// Whether the up handed over is the view's own, square to it at any pitch, to be taken as it is
+    /// rather than eased towards: a view turned directly by the mouse.
+    /// </summary>
+    bool UpIsExact => false;
+
+    /// <summary>
+    /// Whether this view takes the keyboard and the mouse from the game while it is held, reading them
+    /// itself: the course builder, whose keys would otherwise walk the kitten and whose clicks would open
+    /// a part's window.
+    /// </summary>
+    bool TakesInput => false;
+}
+
+/// <summary>Takes the mouse's position, hidden and unbounded, while a view with a swing is held.</summary>
+internal interface IMouseSwing
+{
+    void Cursor(double x, double y);
 }

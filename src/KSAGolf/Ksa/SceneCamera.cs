@@ -28,7 +28,7 @@ internal sealed class SceneCamera : IViewPose
     public double TurnDeg { get; init; }
     public double TiltDeg { get; init; }
 
-    public ChaseOrbit? Orbit => null;
+    public IMouseDrag? Orbit => null;
 
     /// <summary>The eye's offset from the anchor and where it looks, in the ecliptic.</summary>
     public bool TryLook(out double3 offset, out double3 forward, out double3 up)

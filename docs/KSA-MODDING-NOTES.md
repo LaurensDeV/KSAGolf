@@ -714,6 +714,15 @@ half a kitten. Add `Asmb2Ego * CenterOfMassAsmb` back to get the vehicle's origi
 camera's own frame. A position taken into Ego through one and back out through the other is out by the
 distance between them.
 
+### A static mesh of a mod's own is drawn after `ClearBuckets`, or not at all
+
+A `StaticMeshRenderable` drawn from any StarMap hook, or from `Universe.UpdateRenderData`, reaches the
+mesh buckets and is thrown away: `Program.RenderViewport` calls `SuperMeshRenderSystem.ClearBuckets` on
+each viewport it renders and only then draws the kittens into it (`Program.cs:4419`). A postfix on
+`ClearBuckets(IViewport)` is the moment a draw survives, and it is where `Ksa/ViewDrawHook.cs` draws the
+ball. The draw counts as made — nothing logs, nothing throws — so the symptom is only that it is not
+there. Its `Transform` is camera-relative metres: `Ecl − viewport.GetCamera().PositionEcl`.
+
 ### A character attachment is authored in centimetres, a part in metres
 
 The kitten is drawn
@@ -809,6 +818,29 @@ of puffs rather than a plume.
 file for why. What works is moving the emitter itself: the particles are left behind at the
 positions it occupied, and the frame's travel becomes the streak rather than a gap in one. It costs
 one pooled emitter per moving thing.
+
+## A mod's own static collides only if the engine is told it is ground
+
+Found reading the decompiled source for the minigolf course's collider; seen in game only once that
+is done. Each physics bubble owns one Bepu `Simulation` (`ConstraintSim`), stepped on a worker thread,
+and `NarrowPhaseCallbacks.AllowContactGeneration` lets a static meet a body only if it is that
+vehicle's own terrain or launch-pad static (`BepuHandles.IsGroundSurface`), a terrain block, or ground
+clutter (`BubbleClutterStatics.IsClutterStatic`). A static merely added to `Simulation.Statics`
+generates no contacts at all. The same gate, `ConstraintSim.IsGroundSurfaceFor`, decides
+`LocomotionFacts.TerrainContact`, so it is also what makes a kitten stand rather than tumble.
+
+So `Ksa/CourseCollider.cs` adds its boxes to each simulation near the course from prefixes on
+`ConstraintSim.DetectCollisions` and `Simulate`, and registers each handle in the clutter's private
+`_statics` dictionary with infinite mass, which is also what keeps a hit from ever displacing it.
+Clutter clears that dictionary on its own schedule without touching statics it did not make, so the
+registration is repeated every pass. Terrain blocks were the other candidate, but
+`TryRejectBackfaceTerrainContact` drops any contact more than about 84 degrees off the block's +Z, so
+nothing standing upright could be one.
+
+Shapes are in one registry every simulation shares, locked while vehicles step: they are made in a
+prefix on `Universe.ExecuteNextVehicleSolvers`, with `ConstraintSim.UnlockShapes()`, as
+`Ksa/PadSurface.cs` reads launch sites there. A simulation idle for 30 s, or at a save load, is
+returned to a pool, and `TryResetForPool` clears its statics; a prefix there forgets what was added.
 
 ## Threading
 

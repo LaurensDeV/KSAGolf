@@ -4,16 +4,17 @@ using Brutal.Numerics;
 namespace KSAGolf;
 
 /// <summary>
-/// The panel: the world clock, the developer tools, and the log switches. Golf's own controls
-/// arrive with the features that need them.
+/// The panel: putting, the world clock, the developer tools, and the log switches.
 /// </summary>
-internal sealed class Ui(Config config, CraftMover mover)
+internal sealed class Ui(Config config, CraftMover mover, Golf golf, CourseBuilder builder)
 {
     private static readonly float4 Green = new(0.4f, 1.0f, 0.45f, 1f);
     private static readonly float4 Amber = new(1.0f, 0.78f, 0.25f, 1f);
 
     private readonly Config _config = config;
     private readonly CraftMover _mover = mover;
+    private readonly Golf _golf = golf;
+    private readonly CourseBuilder _builder = builder;
 
     public bool Visible = true;
 
@@ -87,6 +88,7 @@ internal sealed class Ui(Config config, CraftMover mover)
     public void Draw()
     {
         Current = this;
+        if (_builder.Active) DrawBuilder();
 
         if (Visible)
         {
@@ -99,6 +101,8 @@ internal sealed class Ui(Config config, CraftMover mover)
                     ImGui.Separator();
                 }
 
+                DrawGolf();
+                ImGui.Separator();
                 DrawWorldClock();
                 ImGui.Separator();
                 DrawCraftMover();
@@ -130,6 +134,97 @@ internal sealed class Ui(Config config, CraftMover mover)
             + "the log, beside the log in bridge/out. Nothing is sent anywhere.");
 
         if (Bridge.LastPlayerCapture is { } last) ImGui.TextDisabled($"  saved {last}");
+    }
+
+    private void DrawGolf()
+    {
+        ImGui.Checkbox("Play golf", ref _config.PlayGolf);
+        Tip("The kitten you fly carries a putter. Drop a ball, walk up to it and press G: the kitten steps "
+            + "up beside the ball to hit it to its left, the view stays where it is, and the mouse swings "
+            + "the club. Which way takes it back and which way hits is said below. G again steps away.");
+
+        if (!_config.PlayGolf) return;
+
+        if (!_golf.Holding)
+        {
+            ImGui.TextDisabled("  fly a kitten out on the ground to pick up the putter");
+            return;
+        }
+
+        if (ImGui.Button(_builder.Active ? "Stop building (B)" : "Build a course (B)")) _builder.Toggle();
+        Tip("Look straight down on a grid in front of the kitten and lay a minigolf hole out of pieces, from a "
+            + "tee to a cup. The kitten stays where it is.");
+        if (!_builder.Active && _builder.Status.Length > 0 && _builder.Course.Pieces.Count == 0) ImGui.TextDisabled($"  {_builder.Status}");
+
+        ImGui.Checkbox("First-person view (V)", ref _config.FirstPerson);
+        Tip("See through the kitten's eyes. The mouse looks around and the kitten faces where you look, so "
+            + "left and right step sideways. Hold Alt for the cursor. At address it looks down at the ball.");
+
+        if (ImGui.Button(_golf.HasBall ? "Drop a new ball" : "Drop a ball")) _golf.DropBall();
+        Tip("Puts a ball down in front of the kitten, replacing the one in play.");
+
+        if (_golf.HasBall)
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Pick up the ball")) _golf.PickUpBall();
+
+            ImGui.SameLine();
+            if (ImGui.Button(_golf.Addressing ? "Step away (G)" : "Address (G)")) _golf.AddressOrStepAway();
+
+            if (_golf.BallDistance is { } away)
+            {
+                ImGui.TextDisabled($"  ball {Distance.Say(away)} away{(_golf.BallResting ? "" : ", rolling")}");
+            }
+        }
+
+        if (_golf.Addressing) ImGui.TextColored(Green, $"  club {_golf.SwingDeg:+0;-0} deg");
+        if (_golf.Status.Length > 0) ImGui.TextColored(Amber, $"  {_golf.Status}");
+    }
+
+    private void DrawBuilder()
+    {
+        if (ImGui.Begin("Course builder###KSAGolfBuilder", ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            ImGui.TextDisabled("Pieces");
+            Tip("Click a piece, then click the grid to lay it. Near an open end it snaps on. Keys: 1-9 choose, "
+                + "0 picks pieces up to move them, R turns, M mirrors, PgUp/PgDn change level, X or Del removes, "
+                + "Ctrl+Z / Ctrl+Y undo and redo. WASD or a right or middle drag pans, the wheel zooms, Q/E turn "
+                + "the view. B leaves.");
+
+            if (ImGui.RadioButton("Move (0)", _builder.Selected < 0)) _builder.Select(-1);
+            for (int n = 0; n < PieceCatalogue.All.Length; n++)
+            {
+                PieceDef def = PieceCatalogue.All[n];
+                if (n % 3 != 2) ImGui.SameLine();
+                if (ImGui.RadioButton($"{def.Name}{(n < 9 ? $" ({n + 1})" : "")}###piece{n}", _builder.Selected == n)) _builder.Select(n);
+            }
+
+            ImGui.TextDisabled($"  turned {_builder.Orientation.Quarter * 90} deg{(_builder.Orientation.Mirrored ? ", mirrored" : "")}, level {_builder.Level}");
+            ImGui.Separator();
+
+            ImGui.TextColored(_builder.Report.Playable ? Green : Amber, _builder.Status);
+
+            if (ImGui.Button("Undo") && _builder.CanUndo) _builder.Undo();
+            ImGui.SameLine();
+            if (ImGui.Button("Redo") && _builder.CanRedo) _builder.Redo();
+            ImGui.SameLine();
+            if (ImGui.Button("Clear")) _builder.Clear();
+            ImGui.SameLine();
+            if (ImGui.Button("Sample hole")) _builder.LoadSample();
+            Tip("Replaces the course with a hole built from every kind of piece.");
+
+            ImGui.Separator();
+            if (ImGui.Button(_builder.Name.Length > 0 ? $"Save {_builder.Name}" : "Save")) _builder.Save();
+            foreach (string saved in CourseBuilder.Saved())
+            {
+                ImGui.SameLine();
+                if (ImGui.SmallButton($"Load {saved}")) _builder.Load(saved);
+            }
+
+            if (ImGui.Button("Done (B)")) _builder.Leave();
+        }
+
+        ImGui.End();
     }
 
     // KSA's own roller stops at 0.1x; these go two decades below.

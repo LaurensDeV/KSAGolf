@@ -20,4 +20,10 @@ public sealed class Config
 
     /// <summary>Click a craft to lift it, click the ground to set it down.</summary>
     public bool MoveCraftWithMouse;
+
+    /// <summary>The flown kitten carries a putter, and G steps it up to the ball.</summary>
+    public bool PlayGolf = true;
+
+    /// <summary>See through the kitten's eyes while playing golf; the mouse looks around.</summary>
+    public bool FirstPerson;
 }

@@ -5,8 +5,10 @@ golf carts and minigolf courses.
 
 What exists is the foundation: the frame and epoch plumbing, ground and hull contact, air and water
 drag, cursor picking, the camera controller, the kitten pose and attachment probes, the developer
-bridge, and the build, CI and KSA-update tooling. **No golf feature exists yet.**
-[Where golf starts](#where-golf-starts) says what each feature builds on.
+bridge, and the build, CI and KSA-update tooling. **Putting is the one golf feature**: the flown kitten
+carries a putter, drops a ball, steps up to it with G and swings with the mouse (`Ksa/Golf.cs`), in
+third person or through its eyes with V.
+[Where golf starts](#where-golf-starts) says what the rest builds on.
 
 ## Read this first
 
@@ -178,6 +180,24 @@ test build, and a new file under `Sim/` is tested the moment it exists.
 | `Sim/SmoothedStep.cs` | the step evened out, for the one consumer that wants a smooth clock — a camera's ease, never the world |
 | `Sim/Medium.cs` | what air or water does to a body — buoyancy and quadratic drag against **one reference air for every body**, and a sphere's drag constant from its mass, diameter and coefficient |
 | `Sim/ContactSweep.cs` | whether a body runs into something over one step, rather than whether it is near at either end |
+| `Sim/GolfBall.cs` | **the ball, in the body-fixed frame of the world under it** — flight, bounce, rolling resistance, slopes and coming to rest |
+| `Sim/PutterRig.cs` | where the putter and the ball sit around a kitten at address, in its model space, for a swing angle |
+| `Sim/PuttingStroke.cs` | the mouse's left and right swinging the club, and the face crossing the ball as the strike |
+| `Sim/Orient.cs` | the rotation carrying one facing-and-up pair onto another |
+| `Sim/StrikeSound.cs` | which recorded whack a putt or a landing sounds like, and how loud |
+| `Sim/HeadLook.cs` | looking around from the kitten's eyes with the captured mouse, measured from the world |
+| `Sim/IMouseDrag.cs` | a view the right button turns: `ChaseOrbit` and `HeadLook` |
+| `Sim/Stance.cs` | where a kitten is drawn standing to address a ball — **drawn, because a landed kitten cannot be moved** |
+| `Sim/CourseGrid.cs` | a course's grid: cells, sides, orientations, and **a port as the cell edge a lane crosses**, never a tile |
+| `Sim/PieceCatalogue.cs` | the pieces a course is built from, their footprints and ports — **ids append-only**, a saved course names them |
+| `Sim/Course.cs` | **one hole**: pieces joined port to port from tee to cup, the check that says why it cannot be played, and a ghost snapping onto an open port |
+| `Sim/CourseEdits.cs` | undo and redo over a course being built |
+| `Sim/PieceShape.cs` | **what each piece is exactly made of** — rails, posts, cup and felt — the one source the ball collides with and the Blender models are built from |
+| `Sim/CourseSurface.cs` | a laid course as the ball meets it: the felt as ground, rails and posts **swept**, and the ground beyond it |
+| `Sim/CourseColliders.cs` | the slab under each piece as a box, for the kitten to stand on |
+| `Sim/CourseLines.cs` | a course as lines on its grid, with a ramp's rise, and the sample hole of every piece |
+| `Sim/CourseBuild.cs` | the builder's straight-down camera, the cell under the cursor, and the ghost a click would place |
+| `Sim/CourseFile.cs` | a course as saved, its floor kept **above the ground** rather than as a radius, and the provisional sizes it is built to |
 | `Sim/IHullTest.cs` | **the seam a moving body asks whether it truly touched a craft** |
 | `Sim/IGroundTest.cs` | where the ground is under a point |
 | `Sim/CoarseGroundTest.cs` | a ground test that skips the lookups a body high above the ground cannot need |
@@ -198,8 +218,17 @@ test build, and a new file under `Sim/` is tested the moment it exists.
 | **`src/KSAGolf/Ksa/`** | **everything that binds to the game** |
 | `Ksa/KSAGolfMod.cs` | StarMap entry point and frame hooks |
 | `Ksa/KsaWorld.cs` | most KSA contact is funnelled here — keep it that way |
-| `Ksa/PreRenderHook.cs` | **one of two places this mod patches the game** — a step before the render on a frame that draws no UI |
-| `Ksa/WorldReloadHook.cs` | the other — **that a save was loaded**, which nothing else can tell |
+| `Ksa/PreRenderHook.cs` | **one of the places this mod patches the game**, listed under the design decisions — a step before the render on a frame that draws no UI |
+| `Ksa/WorldReloadHook.cs` | another — **that a save was loaded**, which nothing else can tell |
+| `Ksa/FirstPersonHook.cs` | a patch — **first person strips the kitten from the main view only**, keeps its whole shadow, and holds its facing on the look; KSArmory's technique |
+| `Ksa/ViewDrawHook.cs` | a patch — **where a mesh of the mod's own is drawn into every viewport**, the ball; the only moment a static mesh's draw is not cleared before the render |
+| `Ksa/Golf.cs` | **putting**: the flown kitten carries the putter, drops a ball, steps up to it on G, and the mouse swings the club |
+| `Ksa/CourseBuilder.cs` | **building a hole from above**: the view straight down, a ghost snapping onto open ports, place, move, remove, undo, save — **the view takes the keys and clicks from the game** so the kitten does not walk off |
+| `Ksa/CourseCollider.cs` | a patch — **the course as ground a kitten stands on**: static boxes in each physics bubble, **registered as clutter**, the only kind of mod static the engine lets collide |
+| `Ksa/GolfPose.cs` | the kitten bent over the ball with its paws on the grip, and the club placed against each view's own wrist |
+| `Ksa/GolfSounds.cs` | a sound from `KSAGolfSounds.xml` played at a point in the world |
+| `Ksa/PadSurface.cs` | **the top of a launch site under a point** — a ray cast down into its collider and the ground it draws |
+| `Ksa/KittenFrame.cs` | a kitten's model space against the world, and standing a kitten on a spot facing a chosen way |
 | `Ksa/LevelHorizonController.cs` | KSA's fixed camera controller, with an up vector it does not otherwise offer, and the orbit drag while a view is borrowed |
 | `Ksa/SceneCamera.cs` | a camera held for a composed shot, from the bridge's `frame` |
 | `Ksa/GroundTest.cs` | the surface under a point, off the engine's own height field |
@@ -215,6 +244,9 @@ test build, and a new file under `Sim/` is tested the moment it exists.
 | `Ksa/Ui/Ui.cs` | the panel: world clock, craft mover, send to another body, logging, Capture for Claude |
 | `Ksa/Ui/ModMenuEntry.cs` | a copied attribute so ModMenu can list this mod — **wanted gone**, see `docs/BLOCKED-ON-KSA.md` |
 | `src/KSAGolf/mod.toml` | serves as both the content-mod and StarMap manifest; `assets` lists every asset XML by name |
+| `src/KSAGolf/KSAGolfSounds.xml` | the putt and landing sounds, `Sounds/` beside it — cut from a recording the user supplied |
+| `src/KSAGolf/KSAGolfCourse.xml` | every course piece's model, one `<GltfFile>` each in metres with the footprint's south-west corner at the origin, a mirrored twin for a chiral piece, a plinth for raised ones, and **one material over one atlas for all of them** |
+| `src/KSAGolf/KSAGolfProps.xml` | the ball and the putter, as `<GltfFile>` and `<PbrMaterial>` pairs a kitten holds — `Meshes/` and `Textures/` beside it; the `.blend` source is outside the repository |
 | `tests/KSAGolf.Tests/` | links the KSA-free sources and runs them headlessly |
 | `KSAGolf.sln` | both projects, for editors only — every script builds a csproj directly |
 | `tools/apidump/` | reflection dumper for the game assemblies |
@@ -241,15 +273,27 @@ test build, and a new file under `Sim/` is tested the moment it exists.
 
 ## Where golf starts
 
-- **A club in a kitten's hands.** `docs/KITTEN-ARMS.md` is the record: `Ksa/KittenPoseProbe.cs`
-  poses bones and `Ksa/KittenPropProbe.cs` hangs a mesh on one, through `Ksa/AttachmentMesh.cs`.
-- **The ball.** A ball is something the mod integrates and draws, so the frame contract below and
-  `docs/FRAMES-AND-EPOCHS.md` apply in full. `Sim/Medium.cs`, `Sim/ContactSweep.cs`,
-  `Sim/IGroundTest.cs`, `Ksa/GroundTest.cs` and `Ksa/HullTest.cs` are its drag and its contacts.
+- **Putting** is built: `Ksa/Golf.cs` holds the session, `Ksa/GolfPose.cs` the kitten and club,
+  `Sim/GolfBall.cs` the ball, `Sim/PutterRig.cs` and `Sim/PuttingStroke.cs` the swing. The bridge's
+  `golf` command drives it without a hand on the mouse.
+- **The ball lives in the body-fixed frame of the world under it**, so it carries none of the
+  planet's motion and the frame contract reduces to drawing it against the body's pose at the instant
+  it is drawn. It rests on the higher of the height field and a launch site's collider and drawn
+  ground, found by a ray cast down into them (`Ksa/PadSurface.cs`): the field knows only the terrain,
+  the apron stands 10 cm proud of it, and the drawn road runs on 40 m past the collider.
+- **A kitten is stepped up to the ball by drawing it there**, not by moving it: a landed kitten's
+  `Teleport` rebuilds it from an orbit and throws it about. `Sim/Stance.cs` is the drawn step.
+- **Longer shots** want the ball to leave the ground: `Sim/Medium.cs` already drags it, and
+  `Sim/ContactSweep.cs`, `Ksa/GroundTest.cs` and `Ksa/HullTest.cs` are its contacts with craft.
 - **Watching the ball.** `Sim/ChaseView.cs`, `Sim/ChaseOrbit.cs`, `Sim/ViewClaim.cs` and
   `Ksa/LevelHorizonController.cs` are a camera riding a body with the main view.
 - **Aiming a shot, and a preview of it.** A preview is best flown — the same body stepped through
   the same air and ground — rather than solved in closed form, which drag rules out.
+- **Minigolf courses** are one hole each, pieces on a grid joined port to port from a tee to a cup.
+  `Sim/Course.cs` and its neighbours are the grid model, and `Ksa/CourseBuilder.cs` lays one out from
+  above (B). The ball banks off its rails and drops in its cup through `Sim/CourseSurface.cs`, off
+  exact shapes rather than the meshes' triangles, which snag at every seam; a kitten stands on its
+  slabs through `Ksa/CourseCollider.cs`.
 - **Carts and course pieces** are parts: see [Parts](#parts), `docs/FROM-KSP-MODDING.md` and the
   `ksa-blender` skill. A craft is placed with `Ksa/CraftMover.cs`; `Sim/TerrainMap.cs` and
   `Sim/GroundSlope.cs` are a local frame and the lie of the ground.
@@ -370,7 +414,15 @@ or a craft the engine will not resolve becomes silently untouchable.
 `Program.OnFrameCelestials`, a private method, so a rename makes the patch not apply; it is logged
 once and the frame postfix steps as before. `Ksa/WorldReloadHook.cs` postfixes `Program.OnGameLoaded`,
 public and static, so its signature is pinned in `docs/KSA-API-SURFACE.md` and a change to it is a
-build error; losing it costs one reload's worth of stale state. **Nothing in a patch may throw** — it
+build error; losing it costs one reload's worth of stale state. `Ksa/ViewDrawHook.cs` postfixes
+`SuperMeshRenderSystem.ClearBuckets`, public and pinned the same way; losing it leaves the ball
+undrawn and nothing else. `Ksa/FirstPersonHook.cs` prefixes and postfixes `KittenEva.UpdateRenderData`,
+`AnimatedRenderable.Draw` and `StaticMeshRenderable.Draw`; losing it leaves first person looking out
+through the kitten's head. `Ksa/PadSurface.cs` prefixes `Universe.ExecuteNextVehicleSolvers` to copy
+the launch sites' colliders; losing it rests the ball on terrain alone. `Ksa/CourseCollider.cs` prefixes
+the same method to make shapes, and `ConstraintSim.DetectCollisions`, `Simulate` and `TryResetForPool`
+to keep the course's statics in each bubble, and reaches a private dictionary of the engine's ground
+clutter by reflection; losing it lets a kitten walk through a course. **Nothing in a patch may throw** — it
 runs inside the engine's frame loop. Harmony ships with StarMap, so a player installs nothing.
 
 **The world is never left across a save load.** StarMap has no load hook and the flight scene
@@ -470,6 +522,11 @@ weakening: `DrawAnchorTests` (the two instants), `SkippedFrameTests` (a missed f
 not lost), `FrameLatchTests` (the latch is always released), and `ContactSweepTests` (a step is not
 stepped over).
 
-**A behaviour change is unverified until it has been seen in game**, whatever the suite says. Nothing
-in this tree has been run in game since the cut — including that the mod loads with an empty
-`assets` list.
+**A behaviour change is unverified until it has been seen in game**, whatever the suite says. Since
+the cut, only the mod loading with `KSAGolfProps.xml`, the bridge's `frame`, `capture` and
+`kitten_prop`, and the putter and ball drawn on a kitten have been seen in game.
+
+**Another developer install can answer the bridge.** A mod built from the same tooling with its own
+`developer` file reads the same `Logs/bridge` folder, and whichever mod reads a command first answers
+it. Replies missing fields, a `capture` that never answers, or a `frame` dropped at once mean another
+mod took the command; its own log names it.

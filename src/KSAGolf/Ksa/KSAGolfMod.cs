@@ -19,6 +19,8 @@ public sealed class KSAGolfMod
     private readonly Config _config = new();
     private readonly FrameLatch _frame = new();
     private readonly CraftMover _mover = new();
+    private Golf? _golf;
+    private CourseBuilder? _builder;
 
     private double _lastSimSpeed = 1.0;
     private double _lastSimStep;
@@ -45,13 +47,20 @@ public sealed class KSAGolfMod
         // flight scene across it.
         WorldReloadHook.Install();
 
-        if (Build.Developer) _bridge = new Bridge(_config);
+        _golf = new Golf(_config);
+        _builder = new CourseBuilder(_golf);
+        ViewDrawHook.Install(DrawIntoView);
+        FirstPersonHook.Install();
+        PadSurface.Install();
+        CourseCollider.Install();
+
+        if (Build.Developer) _bridge = new Bridge(_config, _golf, _builder);
 
         Log.Info(Build.Developer
                      ? "developer install: the bridge and the developer controls are on"
                      : "player install");
 
-        _ui = new Ui(_config, _mover);
+        _ui = new Ui(_config, _mover, _golf, _builder);
         Log.Info("ready - open the 'KSAGolf' panel");
     }
 
@@ -117,6 +126,9 @@ public sealed class KSAGolfMod
             _lastSimStep = KsaWorld.ConsumeSimStep();
         }
 
+        _golf?.Step(KsaWorld.InFlightScene && !KsaWorld.IsPaused ? _lastSimStep : 0.0, dtPlayer);
+        _builder?.Step();
+
         // Driving a borrowed view is not drawing, so it runs with the step and not with the panel.
         _bridge?.DriveCamera();
     }
@@ -127,6 +139,8 @@ public sealed class KSAGolfMod
     {
         Log.Info("a save was loaded - forgetting the previous world");
         _mover.Release();
+        _builder?.Forget();
+        _golf?.Forget();
         KsaWorld.ResetSimStepTracking();
     }
 
@@ -158,6 +172,8 @@ public sealed class KSAGolfMod
             StepOnce(dt);
 
             _ui.Draw();
+            _golf?.Keys();
+            if (KsaWorld.InFlight) _builder?.Input(dt);
 
             // After the panel, so a click on a window is not also a click on the world behind it.
             if (KsaWorld.InFlight)
@@ -177,6 +193,12 @@ public sealed class KSAGolfMod
     {
         _mover.Release();
         _bridge?.Release();
+        _builder?.Release();
+        _golf?.Release();
+        ViewDrawHook.Remove();
+        FirstPersonHook.Remove();
+        PadSurface.Remove();
+        CourseCollider.Remove();
 
         // The mod's own camera controller would otherwise outlive it for the rest of the session.
         KsaWorld.RestoreStockController();
@@ -191,6 +213,12 @@ public sealed class KSAGolfMod
         Log.Shutdown();
     }
 
+    private void DrawIntoView(IViewport viewport)
+    {
+        _golf?.Draw(viewport);
+        _builder?.Draw(viewport);
+    }
+
     private void Fault(string where, Exception e)
     {
         _faults++;
@@ -200,6 +228,12 @@ public sealed class KSAGolfMod
 
         _disabled = true;
         _mover.Release();
+        _builder?.Release();
+        _golf?.Release();
+        ViewDrawHook.Remove();
+        FirstPersonHook.Remove();
+        PadSurface.Remove();
+        CourseCollider.Remove();
         PreRenderHook.Remove();
         WorldReloadHook.Remove();
         Log.Error("too many faults - KSAGolf disabled for this session");

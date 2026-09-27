@@ -5,7 +5,7 @@ name = "KSAGolf"
 # Asset definitions, listed one by one rather than globbed: a file left out of this list is never
 # loaded, and nothing reports it. They sit at the mod root beside Meshes/ and Textures/, so their
 # relative paths resolve the same whether read against the mod root or the XML's own directory.
-assets = []
+assets = ["KSAGolfProps.xml", "KSAGolfSounds.xml", "KSAGolfCourse.xml"]
 
 [StarMap]
 EntryAssembly = "KSAGolf"

@@ -8,8 +8,14 @@ is the thing to hold.
 driven by the bridge's `kitten_pose`, and `Ksa/KittenPropProbe.cs`, driven by `kitten_prop` — and
 `Ksa/AttachmentMesh.cs`, which builds a mod mesh to hang on a kitten.
 
-**What is not built yet:** a grip that follows the hands, a two-handed reach, and a held item
-described as data. The facts below are what they will be built on.
+**Built on it:** `Ksa/GolfPose.cs` holds the putter — carried in the right paw while walking, its grip
+run through the closed fist along the knuckles from index to little finger, and at
+address the whole skeleton drawn stepped up to the ball, bent 24° at the waist, both arms turned at the
+shoulder to point at the grip. In first person (`Ksa/FirstPersonHook.cs`) the main view draws only the
+paws, every other bone folded onto the right wrist, while every other view and the shadow keep the whole
+kitten. Folding onto the chest instead stretched the skin between shoulder and chest into sheets across
+the view, and whole arms fill a view taken from a kitten's head. **Not built:** a held item described as
+data.
 
 ## The pose: `IAnimProcessor`
 
@@ -89,7 +95,14 @@ off.
 Any `mesh` other than `helmet` is an asset prefix: `P` hangs the declared pair `P_Glb` and
 `P_Material`. A mod's own mesh goes through `AttachmentMesh`, by the attachment rules: centimetres baked into the
 vertices, one mesh, one primitive, and the export must name a material slot — `AttachmentMesh`
-fills it before the renderable is made, and with no slot building it throws.
+fills it before the renderable is made, and with no slot building it throws. Flown with
+`KSAGolf_Putter` and `KSAGolf_Ball` (`KSAGolfProps.xml`): both draw at the wrist with their own
+textures. On the right wrist the putter's −Z hangs down, and at `scale` 0.45 its 39 cm reaches the
+ground from a standing kitten's paw.
+
+A prop attached after a second save load in one session draws nothing, and neither does the helmet:
+the draw matrix stays at identity. A fresh launch with the save attaches normally. The cause is not
+known.
 
 ## What the rig is like to hold things with
 
@@ -112,6 +125,12 @@ Measured on the shipped kitten; these are facts about the rig.
   carry, to 34 nm.
 
 ## Engine facts it cost to learn
+
+- **A landed kitten cannot be turned or moved by teleporting it.** `Vehicle.Teleport(null, attitude, null)`
+  sets `Body2Cce` and then overwrites the physics state from the vehicle's analytic orbit, which for a
+  kitten standing on the ground is not where it stands: it was thrown 1.7 m and tilted. And
+  `TeleportToLocation` resets the facing. `Ksa/Golf.cs` carries the skeleton instead — a turn and an
+  offset on the root bones from a pose processor — and leaves the body where the player walked it.
 
 - `KittenEva` draws the model at its origin **less the centre of mass**, so a point measured off the
   model's drawn origin is half a kitten out.

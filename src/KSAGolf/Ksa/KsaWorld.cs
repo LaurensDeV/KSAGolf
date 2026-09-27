@@ -503,6 +503,26 @@ internal static class KsaWorld
         }
     }
 
+    /// <summary>The body of this name in the loaded system, or null.</summary>
+    public static Celestial? FindCelestial(string id)
+    {
+        try
+        {
+            if (Universe.CurrentSystem is not { } system) return null;
+
+            for (int i = 0; i < system.Count; i++)
+            {
+                if (system.GetIndex(i) is Celestial body && body.Id == id) return body;
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Warn($"could not look up body '{id}': {e.Message}");
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Sets a craft down at a latitude and longitude on the body it is nearest.
     ///

@@ -500,11 +500,20 @@ under a particular point. `KsaWorld` resolves the cursor against terrain alone, 
 modelled as a thicker planet swung a bearing measured from a craft beside it through
 168° between two adjacent pixels at the pad's edge.
 
-**What would unblock the rest.** A raycast against static geometry. The pieces exist —
-`StaticObject.CollisionShape` is a public `TypedIndex` and `ConstraintSim.UnlockShapes()` hands out
-the Bepu `Shapes` registry — but nothing here has tried it, and the engine's own per-triangle path
-is `Part.RayCastEgo` against `Ray.RaycastWatertight` (`KSA/KSA/Part.cs:2534`, `:2597`), which takes
-a `Part` and not a landmark.
+**Taken up for the golf ball.** `Ksa/PadSurface.cs` copies each launch site's
+`StaticObject.CollisionShape` out of the Bepu `Shapes` registry `ConstraintSim.UnlockShapes()` hands
+out, placed as `ConstraintSim.UpdateStaticObjectCollider` does, and casts rays into the copy. The
+registry is held by the background vehicle step through most of the frame, the GUI hook included, so
+the copy is taken in a prefix on `Universe.ExecuteNextVehicleSolvers`, between two steps. On the GOLF
+save the apron a kitten stands on is 10.4 cm above the height field and the ray finds it to 1.5 cm of
+the kitten's feet.
+
+**The collider stops well short of what is drawn.** At LC-39A it ends about 15 m from where a kitten
+stands, while the road and grass run on for 40 m more, a few centimetres above the height field. So
+the copy also takes the triangles of the site's models tagged `Terrain`, from the private
+`StaticObject._models` and each mesh's `MeshReference.PositionsCompare`, placed as
+`LocationReference.UpdateStaticObjectRenderData` places them: 4800 triangles across Earth's five sites.
+The cursor still resolves against terrain alone.
 
 ## Drawing a shape the gizmo renderer does not have
 

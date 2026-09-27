@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A putter meeting a ball, by how hard, and a ball dropped on the ground. Each Sound with two files
+     picks one at random, so two putts in a row are not the same click. -->
+<Assets>
+    <Sound Id="KSAGolf_PuttHard" ChannelId="ExternalChannel" SimSpeed="OnlyLower">
+        <SoundFile Path="Sounds/KSAGolf_PuttHard1.wav"/>
+        <SoundFile Path="Sounds/KSAGolf_PuttHard2.wav"/>
+        <SpatialSoundData>
+            <VolumeRange Min="1" Max="120"/>
+            <TwoDRange Min="0" Max="0"/>
+        </SpatialSoundData>
+    </Sound>
+    <Sound Id="KSAGolf_PuttSoft" ChannelId="ExternalChannel" SimSpeed="OnlyLower">
+        <SoundFile Path="Sounds/KSAGolf_PuttSoft1.wav"/>
+        <SoundFile Path="Sounds/KSAGolf_PuttSoft2.wav"/>
+        <SpatialSoundData>
+            <VolumeRange Min="1" Max="80"/>
+            <TwoDRange Min="0" Max="0"/>
+        </SpatialSoundData>
+    </Sound>
+    <Sound Id="KSAGolf_PuttTap" ChannelId="ExternalChannel" SimSpeed="OnlyLower">
+        <SoundFile Path="Sounds/KSAGolf_PuttTap.wav"/>
+        <SpatialSoundData>
+            <VolumeRange Min="1" Max="50"/>
+            <TwoDRange Min="0" Max="0"/>
+        </SpatialSoundData>
+    </Sound>
+    <Sound Id="KSAGolf_Drop" ChannelId="ExternalChannel" SimSpeed="OnlyLower">
+        <SoundFile Path="Sounds/KSAGolf_Drop.wav"/>
+        <SpatialSoundData>
+            <VolumeRange Min="1" Max="50"/>
+            <TwoDRange Min="0" Max="0"/>
+        </SpatialSoundData>
+    </Sound>
+</Assets>

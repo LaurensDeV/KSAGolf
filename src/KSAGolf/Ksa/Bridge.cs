@@ -35,9 +35,14 @@ internal sealed class Bridge
     private Vehicle? _posedFrom;
     private SceneCamera? _scene;
 
-    public Bridge(Config config)
+    private readonly Golf _golf;
+    private readonly CourseBuilder _builder;
+
+    public Bridge(Config config, Golf golf, CourseBuilder builder)
     {
         _config = config;
+        _golf = golf;
+        _builder = builder;
     }
 
     /// <summary>Hands a held view back, so unloading does not leave the player in a pose nothing drives.</summary>
@@ -191,6 +196,8 @@ internal sealed class Bridge
             "get" => Get(command),
             "kitten_pose" => KittenPose(command),
             "kitten_prop" => KittenProp(command),
+            "golf" => GolfCommand(command),
+            "course" => CourseCommand(command),
             "player_capture" => PressTheButton(),
             "frame" => Frame(command),
             "orbit_place" => OrbitPlace(command),
@@ -261,6 +268,76 @@ internal sealed class Bridge
         return BridgeCommand.FieldText(_config, field) is { } text
                    ? Done(new() { [field] = text })
                    : Failed($"no field '{field}' on Config");
+    }
+
+    // The course builder without a hand on the mouse: "action" is one of enter, leave, sample, clear, place,
+    // rotate, mirror, remove, undo, redo, save and load (with "name"); "piece" chooses a piece by id (or
+    // "none" to pick pieces up); "i" and "j" aim the cursor at a cell. Answers with the builder's state.
+    private Reply? CourseCommand(BridgeCommand command)
+    {
+        if (command.Has("piece")) _builder.Select(Array.FindIndex(PieceCatalogue.All, d => d.Id == command.String("piece")));
+        if (command.Has("i") && command.Has("j")) _builder.AimAt(new Cell((int)command.Number("i", 0), (int)command.Number("j", 0)));
+
+        switch (command.String("action"))
+        {
+            case "enter": _builder.Enter(); break;
+            case "leave": _builder.Leave(); break;
+            case "sample": _builder.LoadSample(); break;
+            case "clear": _builder.Clear(); break;
+            case "place": _builder.Click(); break;
+            case "rotate": _builder.Rotate(); break;
+            case "mirror": _builder.Mirror(); break;
+            case "remove": _builder.RemoveUnderCursor(); break;
+            case "undo": _builder.Undo(); break;
+            case "redo": _builder.Redo(); break;
+            case "save": _builder.Save(); break;
+            case "load": _builder.Load(command.String("name")); break;
+        }
+
+        return Done(_builder.ReportState());
+    }
+
+    // Putting without a hand on the mouse: "action" is drop, pickup or address (which also steps away),
+    // and "swing" is the mouse's horizontal movement in pixels, one entry a frame, fed as the player's
+    // would be. Answers with the state once the swing has been fed and "wait_s" more have passed.
+    private Reply? GolfCommand(BridgeCommand command)
+    {
+        switch (command.String("action"))
+        {
+            case "drop": _golf.DropBall(); break;
+            case "pickup": _golf.PickUpBall(); break;
+            case "address": _golf.AddressOrStepAway(); break;
+        }
+
+        if (command.Has("look_yaw_deg")) _golf.LookBy(command.Number("look_yaw_deg", 0.0));
+
+        List<double> swing = [];
+        if (command.TryRaw("swing", out JsonElement moves) && moves.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement move in moves.EnumerateArray())
+            {
+                if (move.TryGetDouble(out double dx)) swing.Add(dx);
+            }
+        }
+
+        double wait = command.Number("wait_s", 0.0);
+        if (swing.Count == 0 && wait <= 0.0) return Done(_golf.Report());
+
+        int next = 0;
+        double waited = 0.0;
+        _running = (dtPlayer, _) =>
+        {
+            if (next < swing.Count)
+            {
+                _golf.Nudge(swing[next++]);
+                return null;
+            }
+
+            waited += dtPlayer;
+            return waited >= wait ? Done(_golf.Report()) : null;
+        };
+
+        return null;
     }
 
     private static Reply KittenProp(BridgeCommand command)

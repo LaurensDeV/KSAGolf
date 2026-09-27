@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Minigolf course pieces, drawn by the mod rather than built as parts. Each is a <GltfFile> in metres,
+     Z up, its footprint's south-west corner at the origin and the felt at z = 0; all share one atlas.
+     A chiral piece has a mirrored twin, since a mirrored draw turns its triangles inside out, and the
+     plinth is a unit block stretched under any piece laid above the ground. -->
+<Assets>
+    <GltfFile Id="KSAGolf_Piece_Tee_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Tee.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_Cup_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Cup.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_Straight_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Straight.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_Corner_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Corner.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_Straight3_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Straight3.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_Bend2_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Bend2.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_SBend_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_SBend.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_SBendMirror_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_SBendMirror.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_Ramp_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Ramp.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_Room2_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Room2.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_Room4_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Room4.glb"/>
+    </GltfFile>
+    <GltfFile Id="KSAGolf_Piece_Plinth_Glb">
+        <Source Path="Meshes/KSAGolf_Piece_Plinth.glb"/>
+    </GltfFile>
+    <PbrMaterial Id="KSAGolf_Course_Material">
+        <Diffuse Path="Textures/KSAGolf_Course_Diffuse.png" Category="Default"/>
+        <Normal Path="Textures/KSAGolf_Course_Normal.png" Category="Default"/>
+        <AoRoughMetal Path="Textures/KSAGolf_Course_PBR.png" Category="Default"/>
+    </PbrMaterial>
+</Assets>

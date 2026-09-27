@@ -13,7 +13,7 @@ namespace KSAGolf;
 /// while the world is paused, which is when a player looks around at leisure —
 /// <see cref="SimClock.Viewing"/> is the clock to advance it on.</para>
 /// </summary>
-public sealed class ChaseOrbit
+public sealed class ChaseOrbit : IMouseDrag
 {
     /// <summary>What KSA's orbit camera turns per pixel dragged.</summary>
     public const double RadiansPerPixel = 0.003;

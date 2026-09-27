@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Things a kitten holds or strikes, hung through CosmeticAttachments rather than built as parts,
+     so each is a <GltfFile> in centimetres with one mesh, one primitive and one material. -->
+<Assets>
+    <GltfFile Id="KSAGolf_Ball_Glb">
+        <Source Path="Meshes/KSAGolf_Ball.glb"/>
+    </GltfFile>
+    <PbrMaterial Id="KSAGolf_Ball_Material">
+        <Diffuse Path="Textures/KSAGolf_Ball_Diffuse.png" Category="Default"/>
+        <Normal Path="Textures/KSAGolf_Ball_Normal.png" Category="Default"/>
+        <AoRoughMetal Path="Textures/KSAGolf_Ball_PBR.png" Category="Default"/>
+    </PbrMaterial>
+
+    <GltfFile Id="KSAGolf_Putter_Glb">
+        <Source Path="Meshes/KSAGolf_Putter.glb"/>
+    </GltfFile>
+    <PbrMaterial Id="KSAGolf_Putter_Material">
+        <Diffuse Path="Textures/KSAGolf_Putter_Diffuse.png" Category="Default"/>
+        <Normal Path="Textures/KSAGolf_Putter_Normal.png" Category="Default"/>
+        <AoRoughMetal Path="Textures/KSAGolf_Putter_PBR.png" Category="Default"/>
+    </PbrMaterial>
+</Assets>
