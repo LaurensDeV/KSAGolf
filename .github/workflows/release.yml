@@ -12,7 +12,7 @@ name: Release
 #
 # Without that secret the version, tag, changelog and notes are still cut, and the release stays a
 # draft with nothing public. ./tools/publish-release.sh attaches the archive from a machine that
-# has KSA and publishes it; spacedock.yml and deploy.yml, run by hand, do the rest.
+# has KSA and publishes it; spacedock.yml, run by hand, does the rest.
 
 on:
   push:
@@ -24,10 +24,6 @@ permissions:
   issues: write
   pull-requests: write
 
-  # For the endpoint job below: a called workflow cannot ask for more than its caller holds, and
-  # deploy.yml needs to pull the image from GHCR. Without this the whole file is rejected as
-  # invalid, so no release is cut at all.
-  packages: read
 
 jobs:
   version:
@@ -173,13 +169,4 @@ jobs:
     uses: ./.github/workflows/spacedock.yml
     with:
       version: ${{ needs.version.outputs.version }}
-    secrets: inherit
-
-  # The endpoint refuses reports from versions older than the newest release, and it learns that
-  # number at deploy time -- so a release that does not redeploy leaves it a version behind. It
-  # waits for the publish because it reads the newest *published* release, which a draft is not.
-  endpoint:
-    needs: [version, artifact]
-    if: ${{ needs.artifact.outputs.published == 'success' }}
-    uses: ./.github/workflows/deploy.yml
     secrets: inherit
