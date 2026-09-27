@@ -67,6 +67,8 @@
     <Reference Include="$(KsaDllDir)Brutal.Vulkan.Abstractions.dll" Private="false" />
     <!-- Needed to compile against Vehicle's mass-properties signatures (Symmetric3x3). -->
     <Reference Include="$(KsaDllDir)BepuUtilities.dll" Private="false" />
+    <!-- The launch sites' colliders, which the ball is rested on: PadSurface. -->
+    <Reference Include="$(KsaDllDir)BepuPhysics.dll" Private="false" />
     <Reference Include="$(KsaDllDir)Brutal.Glfw.dll" Private="false" />
     <!-- JobScheduler, for KsaWorld.WaitForVehicleSolvers: the barrier before removing a vehicle. -->
     <Reference Include="$(KsaDllDir)Brutal.Concurrency.dll" Private="false" />
